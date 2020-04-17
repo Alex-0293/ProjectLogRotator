@@ -48,27 +48,41 @@ Initialize-Logging   $MyScriptRoot "Latest"
 
 Add-ToLog -Message "Project log rotator started." -logFilePath $Global:LogFilePath -display -status "Info"
 
-$LogsFolders = Get-ChildItem -path $Global:ProjectsFolder -Directory -Filter "LOGS" -Recurse
+$LogsFolders = Get-ChildItem -path $Global:ProjectsFolder -Directory -Filter "LOGS" -Recurse -ErrorAction SilentlyContinue
 [datetime] $DeleteAfter = (Get-Date).AddDays(-1* $Global:DaysToRotateLog)
 
 
 foreach ($LogsFolder in $LogsFolders ){
-    $LogFiles = Get-ChildItem -path $LogsFolder.FullName -filter "*.log" -Recurse
+    $LogFiles = Get-ChildItem -path $LogsFolder.FullName -filter "*.log" -Recurse  -ErrorAction SilentlyContinue
     foreach ($LogFile in $LogFiles){
+        Write-Host $LogFile
         $Content = Get-Content -Path $LogFile  -Encoding utf8
         [array]$NewContent = @() 
         foreach ($Line in $Content){
             try {
-                [datetime]$Date = [datetime]::ParseExact($line.Substring(0,19), "yyyy-MM-dd HH:mm:ss", $null)
+                [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "yyyy-MM-dd HH:mm:ss", $null)
             }
             Catch {
-                [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19), "dd.MM.yyyy HH:mm:ss", $null)
+                #Write-Host $LogFile
+                try {
+                    [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "dd.MM.yyyy HH:mm:ss", $null)
+                }
+                Catch {
+                    [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "dd.MM.yyyy H:mm:ss", $null) 
+                }
             }
             if ($Date -ge $DeleteAfter){
                 $NewContent += $line
             }
         }
-        $Diff = Get-DifferenceBetweenArrays -FirstArray $Content -SecondArray $NewContent
+
+        if (($Content.count -gt 1) -and ($NewContent.count -gt 1)){
+            $Diff = Get-DifferenceBetweenArrays -FirstArray $Content -SecondArray $NewContent
+        }
+        Else {
+            $Diff = @() 
+        }
+
         if ($Diff.count -gt 0) {
             Add-ToLog -Message "Rotating file [$LogFile]." -logFilePath $Global:LogFilePath -display  -status "Info"
             Out-File -path $LogFile -InputObject $NewContent -Encoding utf8 -Force
