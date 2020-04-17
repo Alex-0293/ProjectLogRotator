@@ -55,37 +55,39 @@ $LogsFolders = Get-ChildItem -path $Global:ProjectsFolder -Directory -Filter "LO
 foreach ($LogsFolder in $LogsFolders ){
     $LogFiles = Get-ChildItem -path $LogsFolder.FullName -filter "*.log" -Recurse  -ErrorAction SilentlyContinue
     foreach ($LogFile in $LogFiles){
-        Write-Host $LogFile
-        $Content = Get-Content -Path $LogFile  -Encoding utf8
-        [array]$NewContent = @() 
-        foreach ($Line in $Content){
-            try {
-                [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "yyyy-MM-dd HH:mm:ss", $null)
-            }
-            Catch {
-                #Write-Host $LogFile
+        if (!($Global:ExcludeFiles -contains $LogFile.name)){
+            $FilePath = $LogFile.FullName
+            Write-Host $LogFilePath
+            $Content = Get-Content -Path $FilePath  -Encoding utf8
+            [array]$NewContent = @() 
+            foreach ($Line in $Content){
+                $Resolved = $True            
                 try {
-                    [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "dd.MM.yyyy HH:mm:ss", $null)
+                    [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "yyyy-MM-dd HH:mm:ss", $null)
                 }
-                Catch {
-                    [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "dd.MM.yyyy H:mm:ss", $null) 
+                Catch {                
+                    try {
+                        [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "dd.MM.yyyy HH:mm:ss", $null)
+                    }
+                    Catch {
+                        try{
+                            [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "dd.MM.yyyy H:mm:ss", $null) 
+                        }
+                        Catch{
+                            $Resolved = $false
+                            Add-ToLog -Message "Error in [$Line] line skipped!" -logFilePath $Global:LogFilePath -display -status "Error"
+                        }
+                    }
+                }
+                if (($Date -ge $DeleteAfter) -and $resolved){
+                    $NewContent += $line
                 }
             }
-            if ($Date -ge $DeleteAfter){
-                $NewContent += $line
+
+            if ($NewContent.count -gt 0) {
+                Add-ToLog -Message "Rotating file [$FilePath]." -logFilePath $Global:LogFilePath -display  -status "Info"
+                Out-File  -FilePath $FilePath -InputObject $NewContent -Encoding utf8 -Force
             }
-        }
-
-        if (($Content.count -gt 1) -and ($NewContent.count -gt 1)){
-            $Diff = Get-DifferenceBetweenArrays -FirstArray $Content -SecondArray $NewContent
-        }
-        Else {
-            $Diff = @() 
-        }
-
-        if ($Diff.count -gt 0) {
-            Add-ToLog -Message "Rotating file [$LogFile]." -logFilePath $Global:LogFilePath -display  -status "Info"
-            Out-File -path $LogFile -InputObject $NewContent -Encoding utf8 -Force
         }
     }
 }
