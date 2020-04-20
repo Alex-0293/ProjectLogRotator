@@ -41,56 +41,60 @@ trap {
 
 Clear-Host
 
-[string]$MyScriptRoot        = Get-WorkDir
-[string]$Global:ProjectRoot  = Split-Path $MyScriptRoot -parent
+[string]$Global:MyScriptRoot = Get-WorkDir
+[string]$Global:GlobalSettingsPath = "C:\DATA\Projects\GlobalSettings\SETTINGS\Settings.ps1"
 
-Get-VarsFromFile    "$ProjectRoot\VARS\Vars.ps1"
-Initialize-Logging   $ProjectRoot "Latest"
+Get-SettingsFromFile -SettingsFile $Global:GlobalSettingsPath
+Get-SettingsFromFile -SettingsFile "$ProjectRoot\$SETTINGSFolder\Settings.ps1"
+Initialize-Logging   "$ProjectRoot\$LOGSFolder\$ErrorsLogFileName" "Latest"
 
-Add-ToLog -Message "Project log rotator started." -logFilePath $Global:LogFilePath -display -status "Info"
+Add-ToLog -Message "Project log rotator started." -logFilePath $ScriptLogFilePath -display -status "Info"
 
-$LogsFolders = Get-ChildItem -path $Global:ProjectsFolder -Directory -Filter "LOGS" -Recurse -ErrorAction SilentlyContinue
-[datetime] $DeleteAfter = (Get-Date).AddDays(-1* $Global:DaysToRotateLog)
+foreach ($Folder in $FoldersToApplyPath){
+    
+    $LogsFolders = Get-ChildItem -path $Folder -Directory -Filter $LOGSFolder -Recurse -ErrorAction SilentlyContinue
+    [datetime] $DeleteAfter = (Get-Date).AddDays(-1* $Global:DaysToRotateLog)
 
+    foreach ($LogsFolder in $LogsFolders ){        
+        $LogFiles = Get-ChildItem -path $LogsFolder -filter "*.log" -ErrorAction SilentlyContinue
 
-foreach ($LogsFolder in $LogsFolders ){
-    $LogFiles = Get-ChildItem -path $LogsFolder.FullName -filter "*.log" -Recurse  -ErrorAction SilentlyContinue
-    foreach ($LogFile in $LogFiles){
-        if (!($Global:ExcludeFiles -contains $LogFile.name)){
-            $FilePath = $LogFile.FullName
-            Write-Host $LogFilePath
-            $Content = Get-Content -Path $FilePath  -Encoding utf8
-            [array]$NewContent = @() 
-            foreach ($Line in $Content){
-                $Resolved = $True            
-                try {
-                    [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "yyyy-MM-dd HH:mm:ss", $null)
-                }
-                Catch {                
+        foreach ($LogFile in $LogFiles){
+
+            if (!($Global:ExcludeFiles -contains $LogFile)){                
+                $FilePath = $LogFile
+                Add-ToLog -Message "    Processing [$FilePath]." -logFilePath $ScriptLogFilePath -display -status "Info"
+                $Content = Get-Content -Path $FilePath  -Encoding utf8
+                [array]$NewContent = @() 
+                foreach ($Line in $Content){
+                    $Resolved = $True            
                     try {
-                        [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "dd.MM.yyyy HH:mm:ss", $null)
+                        [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "yyyy-MM-dd HH:mm:ss", $null)
                     }
-                    Catch {
-                        try{
-                            [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "dd.MM.yyyy H:mm:ss", $null) 
+                    Catch {                
+                        try {
+                            [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "dd.MM.yyyy HH:mm:ss", $null)
                         }
-                        Catch{
-                            $Resolved = $false
-                            Add-ToLog -Message "Error in [$Line] line skipped!" -logFilePath $Global:LogFilePath -display -status "Error"
+                        Catch {
+                            try{
+                                [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "dd.MM.yyyy H:mm:ss", $null) 
+                            }
+                            Catch{
+                                $Resolved = $false
+                                Add-ToLog -Message "    Error in [$Line] line skipped!" -logFilePath $ScriptLogFilePath -display -status "Error"
+                            }
                         }
+                    }
+                    if (($Date -ge $DeleteAfter) -and $resolved){
+                        $NewContent += $line
                     }
                 }
-                if (($Date -ge $DeleteAfter) -and $resolved){
-                    $NewContent += $line
-                }
-            }
 
-            if ($NewContent.count -gt 0) {
-                Add-ToLog -Message "Rotating file [$FilePath]." -logFilePath $Global:LogFilePath -display  -status "Info"
-                Out-File  -FilePath $FilePath -InputObject $NewContent -Encoding utf8 -Force
+                if ($NewContent.count -gt 0) {
+                    Add-ToLog -Message "    Rotating file [$FilePath]." -logFilePath $ScriptLogFilePath -display  -status "Info"
+                    Out-File  -FilePath $FilePath -InputObject $NewContent -Encoding utf8 -Force
+                }
             }
         }
     }
 }
-
-Add-ToLog -Message "Project log rotator completed." -logFilePath $Global:LogFilePath -display -status "Info"
+Add-ToLog -Message "Project log rotator completed." -logFilePath $ScriptLogFilePath -display -status "Info"

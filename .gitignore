@@ -1,5 +1,6 @@
-Vars.ps1
+ACL/Access.csv
+ACL/Owner.csv
+ACL/Roles.csv
 LOGS/Errors.log
 LOGS/ProjectLogRotator.log
-ACL/Roles.csv
-ACL/Owner.csv
+SETTINGS/Settings.ps1
