@@ -7,15 +7,15 @@
     .PARAMETER
     .EXAMPLE
 #>
-$MyScriptRoot = "C:\DATA\ProjectServices\ProjectLogRotator\SCRIPTS"
-$InitScript   = "C:\DATA\Projects\GlobalSettings\SCRIPTS\Init.ps1"
-
-. "$InitScript" -MyScriptRoot $MyScriptRoot
-
+Clear-Host
+$Global:ScriptName = $MyInvocation.MyCommand.Name
+$InitScript        = "C:\DATA\Projects\GlobalSettings\SCRIPTS\Init.ps1"
+if (. "$InitScript" -MyScriptRoot (Split-Path $PSCommandPath -Parent)) { exit 1 }
 # Error trap
 trap {
     if ($Global:Logger) {
-        Get-ErrorReporting $_ 
+       Get-ErrorReporting $_
+        . "$GlobalSettings\$SCRIPTSFolder\Finish.ps1"  
     }
     Else {
         Write-Host "There is error before logging initialized." -ForegroundColor Red
@@ -23,9 +23,6 @@ trap {
     exit 1
 }
 ################################# Script start here #################################
-Clear-Host
-
-Add-ToLog -Message "Project log rotator started." -logFilePath $ScriptLogFilePath -display -status "Info"
 
 foreach ($Folder in $FoldersToApplyPath){
     
@@ -39,7 +36,7 @@ foreach ($Folder in $FoldersToApplyPath){
 
             if (!($Global:ExcludeFiles -contains $LogFile)){                
                 $FilePath = $LogFile
-                Add-ToLog -Message "    Processing [$FilePath]." -logFilePath $ScriptLogFilePath -display -status "Info"
+                Add-ToLog -Message "Processing [$FilePath]." -logFilePath $ScriptLogFilePath -display -status "Info" -level ($ParentLevel + 1)
                 $Content = Get-Content -Path $FilePath  -Encoding utf8
                 [array]$NewContent = @() 
                 foreach ($Line in $Content){
@@ -57,7 +54,7 @@ foreach ($Folder in $FoldersToApplyPath){
                             }
                             Catch{
                                 $Resolved = $false
-                                Add-ToLog -Message "    Error in [$Line] line skipped!" -logFilePath $ScriptLogFilePath -display -status "Error"
+                                Add-ToLog -Message "Error in [$Line] line skipped!" -logFilePath $ScriptLogFilePath -display -status "Error" -level ($ParentLevel + 1)
                             }
                         }
                     }
@@ -67,14 +64,13 @@ foreach ($Folder in $FoldersToApplyPath){
                 }
 
                 if ($NewContent.count -gt 0) {
-                    Add-ToLog -Message "    Rotating file [$FilePath]." -logFilePath $ScriptLogFilePath -display  -status "Info"
+                    Add-ToLog -Message "Rotating file [$FilePath]." -logFilePath $ScriptLogFilePath -display  -status "Info" -level ($ParentLevel + 1)
                     Out-File  -FilePath $FilePath -InputObject $NewContent -Encoding utf8 -Force
                 }
             }
         }
     }
 }
-Add-ToLog -Message "Project log rotator completed." -logFilePath $ScriptLogFilePath -display -status "Info"
 
 ################################# Script end here ###################################
 . "$GlobalSettings\$SCRIPTSFolder\Finish.ps1"
