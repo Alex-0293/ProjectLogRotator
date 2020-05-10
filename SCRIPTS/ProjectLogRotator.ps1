@@ -10,7 +10,7 @@
 Clear-Host
 $Global:ScriptName = $MyInvocation.MyCommand.Name
 $InitScript        = "C:\DATA\Projects\GlobalSettings\SCRIPTS\Init.ps1"
-if (. "$InitScript" -MyScriptRoot (Split-Path $PSCommandPath -Parent)) { exit 1 }
+if (. "$InitScript" -MyScriptRoot (Split-Path $PSCommandPath -Parent) -force ) { exit 1 }
 # Error trap
 trap {
     if ($Global:Logger) {
@@ -29,13 +29,13 @@ foreach ($Folder in $FoldersToApplyPath){
     $LogsFolders = Get-ChildItem -path $Folder -Directory -Filter $LOGSFolder -Recurse -ErrorAction SilentlyContinue
     [datetime] $DeleteAfter = (Get-Date).AddDays(-1* $Global:DaysToRotateLog)
 
-    foreach ($LogsFolder in $LogsFolders ){        
-        $LogFiles = Get-ChildItem -path $LogsFolder -filter "*.log" -ErrorAction SilentlyContinue
+    foreach ($Item in $LogsFolders ){ 
+        write-host $Item.FullName       
+        $LogFiles = Get-ChildItem -path $Item.FullName  -filter "*.log" -ErrorAction SilentlyContinue
 
         foreach ($LogFile in $LogFiles){
-
-            if (!($Global:ExcludeFiles -contains $LogFile)){                
-                $FilePath = $LogFile
+            if ( -not ($Global:ExcludeFiles -contains $LogFile) -and ($LogFile.LastWriteTime -gt $DeleteAfter)) {                
+                $FilePath = $LogFile.FullName
                 Add-ToLog -Message "Processing [$FilePath]." -logFilePath $ScriptLogFilePath -display -status "Info" -level ($ParentLevel + 1)
                 $Content = Get-Content -Path $FilePath  -Encoding utf8
                 [array]$NewContent = @() 
@@ -58,12 +58,12 @@ foreach ($Folder in $FoldersToApplyPath){
                             }
                         }
                     }
-                    if (($Date -ge $DeleteAfter) -and $resolved){
+                    if (($Date -gt $DeleteAfter) -and $resolved){
                         $NewContent += $line
                     }
                 }
 
-                if ($NewContent.count -gt 0) {
+                if (($NewContent.count -gt 0) -and ($NewContent.count -ne $Content.count)) {
                     Add-ToLog -Message "Rotating file [$FilePath]." -logFilePath $ScriptLogFilePath -display  -status "Info" -level ($ParentLevel + 1)
                     Out-File  -FilePath $FilePath -InputObject $NewContent -Encoding utf8 -Force
                 }
