@@ -21,7 +21,7 @@ trap {
     if (get-module -FullyQualifiedName AlexkUtils) {
        Get-ErrorReporting $_
 
-        . "$GlobalSettings\$SCRIPTSFolder\Finish.ps1"  
+        . "$GlobalSettingsPath\$SCRIPTSFolder\Finish.ps1"  
     }
     Else {
         Write-Host "[$($MyInvocation.MyCommand.path)] There is error before logging initialized. Error: $_" -ForegroundColor Red
@@ -36,42 +36,44 @@ foreach ($Folder in $FoldersToApplyPath){
     [datetime] $DeleteAfter = (Get-Date).AddDays(-1* $Global:DaysToRotateLog)
 
     foreach ($Item in $LogsFolders ){ 
-        write-host $Item.FullName       
-        $LogFiles = Get-ChildItem -path $Item.FullName  -filter "*.log" -ErrorAction SilentlyContinue
+        if (!($Item.Parent.FullName -in $IgnoreFolders)) {
+            write-host $Item.FullName       
+            $LogFiles = Get-ChildItem -path $Item.FullName  -filter "*.log" -ErrorAction SilentlyContinue
 
-        foreach ($LogFile in $LogFiles){
-            if ( -not ($Global:ExcludeFiles -contains $LogFile) -and ($LogFile.LastWriteTime -gt $DeleteAfter)) {                
-                $FilePath = $LogFile.FullName
-                Add-ToLog -Message "Processing [$FilePath]." -logFilePath $ScriptLogFilePath -display -status "Info" -level ($ParentLevel + 1)
-                $Content = Get-Content -Path $FilePath  -Encoding utf8
-                [array]$NewContent = @() 
-                foreach ($Line in $Content){
-                    $Resolved = $True            
-                    try {
-                        [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "yyyy-MM-dd HH:mm:ss", $null)
-                    }
-                    Catch {                
+            foreach ($LogFile in $LogFiles){
+                if ( -not ($Global:ExcludeFiles -contains $LogFile) -and ($LogFile.LastWriteTime -gt $DeleteAfter)) {                
+                    $FilePath = $LogFile.FullName
+                    Add-ToLog -Message "Processing [$FilePath]." -logFilePath $ScriptLogFilePath -display -status "Info" -level ($ParentLevel + 1)
+                    $Content = Get-Content -Path $FilePath  -Encoding utf8
+                    [array]$NewContent = @() 
+                    foreach ($Line in $Content){
+                        $Resolved = $True            
                         try {
-                            [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "dd.MM.yyyy HH:mm:ss", $null)
+                            [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "yyyy-MM-dd HH:mm:ss", $null)
                         }
-                        Catch {
-                            try{
-                                [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "dd.MM.yyyy H:mm:ss", $null) 
+                        Catch {                
+                            try {
+                                [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "dd.MM.yyyy HH:mm:ss", $null)
                             }
-                            Catch{
-                                $Resolved = $false
-                                Add-ToLog -Message "Error in [$Line] line skipped!" -logFilePath $ScriptLogFilePath -display -status "Error" -level ($ParentLevel + 1)
+                            Catch {
+                                try{
+                                    [datetime]$Date = [datetime]::ParseExact($line.Substring(0, 19).trim(), "dd.MM.yyyy H:mm:ss", $null) 
+                                }
+                                Catch{
+                                    $Resolved = $false
+                                    Add-ToLog -Message "Error in [$Line] line skipped!" -logFilePath $ScriptLogFilePath -display -status "Error" -level ($ParentLevel + 1)
+                                }
                             }
+                        }
+                        if (($Date -gt $DeleteAfter) -and $resolved){
+                            $NewContent += $line
                         }
                     }
-                    if (($Date -gt $DeleteAfter) -and $resolved){
-                        $NewContent += $line
-                    }
-                }
 
-                if (($NewContent.count -gt 0) -and ($NewContent.count -ne $Content.count)) {
-                    Add-ToLog -Message "Rotating file [$FilePath]." -logFilePath $ScriptLogFilePath -display  -status "Info" -level ($ParentLevel + 1)
-                    Out-File  -FilePath $FilePath -InputObject $NewContent -Encoding utf8 -Force
+                    if (($NewContent.count -gt 0) -and ($NewContent.count -ne $Content.count)) {
+                        Add-ToLog -Message "Rotating file [$FilePath]." -logFilePath $ScriptLogFilePath -display  -status "Info" -level ($ParentLevel + 1)
+                        Out-File  -FilePath $FilePath -InputObject $NewContent -Encoding utf8 -Force
+                    }
                 }
             }
         }
@@ -79,4 +81,4 @@ foreach ($Folder in $FoldersToApplyPath){
 }
 
 ################################# Script end here ###################################
-. "$GlobalSettings\$SCRIPTSFolder\Finish.ps1"
+. "$GlobalSettingsPath\$SCRIPTSFolder\Finish.ps1"
