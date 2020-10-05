@@ -1,12 +1,13 @@
 # Rename this file to Settings.ps1
-######################### value replacement ##################### 
+#### Script params    
+    [array] $global:FoldersToApplyPath  = @()         # Folders where searching
   
-######################### no replacement ######################## 
-    [array]  $global:IgnoreFolders      = @($Global:TemplateProjectPath)           # Ignored folders names.  
-    [array]  $global:FoldersToApplyPath = $Global:WorkFolderList                   # Folders where searching
-    [string] $Global:LogFolder          = $Global:LOGSFolder                       # Logs folder name.
-    [Int16]  $Global:DaysToRotateLog    = 30                                       # Days count to save logs.
-    [array]  $Global:ExcludeFiles       = @("Transcript.log")
+######################### no replacement ########################   
+
+    [string]$Global:LogFolder        = "LOGS"                                       # Logs folder name.
+    [Int16] $Global:DaysToRotateLog  = 30                                           # Days count to save logs.
+    [string]$Global:LogFilePath      = "$ProjectPath\LOGS\$($Global:gsScriptName).log"          # Path to this script log file.
+    [array] $Global:ExcludeFiles     = @("Transcript.log")
 
     [bool] $Global:LocalSettingsSuccessfullyLoaded = $true
 
